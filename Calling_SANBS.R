@@ -1,25 +1,25 @@
 
 rm(list = ls())
-source("/home/laurette/Desktop/Github/SANBAS/SANBS.R", echo = FALSE)
+source("/home/laurette/Desktop/Github/SANBS/SANBS.R", echo = FALSE)
 #calculate I_1 - I_2
 
-incidence_data1 <- test_statistic_diff_inc(niterations = 10000,
+incidence_data1 <- test_statistic_diff_inc(niterations = 1,
                                             prevalence_func = linear_prevalence,
                                             prevalences_recency_func = linear_prevalence_recency,
                                             start_donationtimes = 2001,
                                             end_donationtimes = 2011,
                                             num_donations = 100000,
-                                            num_interpolations = 2,
+                                            num_interpolations = 11,
                                             time_threshold = 2006, MDRI = 182.5,
                                             big_T = 730, FRR = 0.01)
 
 
 write.table(incidence_data1[[1]], file = "without_diruption_pvalues")
-incidence_data1_pvalues <- read.table("/home/laurette/Desktop/Github/SANBAS/without_diruption_pvalues")
+incidence_data1_pvalues <- read.table("/home/laurette/Desktop/Github/SANBS/without_diruption_pvalues")
 
 
 write.table(incidence_data1[[2]], file = "without_diruption_glm")
-incidence_data1_glm <- read.table("/home/laurette/Desktop/Github/SANBAS/without_diruption_glm")
+incidence_data1_glm <- read.table("/home/laurette/Desktop/Github/SANBS/without_diruption_glm")
 
 #1000 iterations 
 # user      system  elapsed 
@@ -52,8 +52,6 @@ inc_gradient2 <- ggplot(incidence_data1_glm, aes(x = iterations, y = inci_prime_
   theme_bw(base_size = 18, base_family = "")
 
 
-par(mfrow = c(1,2))
-
 ggplot(incidence_data1_glm, aes(pvalue)) +
   geom_histogram(bins = 10)+
   labs(x = "derivative of the incidence", y = " frequency")+
@@ -78,23 +76,70 @@ ggplot(incidence_data1_pvalues, aes(pvalue)) +
 
 # with disruptions  ----------------------------------------------------
 
-incidence_data <-  test_statistic_diff_inc(niterations = 100,
+incidence_data <-  test_statistic_diff_inc(niterations = 1,
                                            prevalence_func = linear_prevalence,
                                            prevalences_recency_func = probability_recency_disrupt,
                                            start_donationtimes = 2001,
                                            end_donationtimes = 2011,
                                            num_donations = 100000,
-                                           num_interpolations = 1,
+                                           num_interpolations = 10,
                                            time_threshold = 2006, MDRI = 182.5,
                                            big_T = 730, FRR = 0.01)
 
 
+
+
+
+datan <-  data.frame(times = 2001:2011, 
+                    true_incidence = linear_incidence(times  = 2001:2011, timesdisrupt = 2006),
+                    timebinnning   = c(rep(incidence_data[[1]]$incidence_1, 6), rep(incidence_data[[1]]$incidence_2, 5)),
+                    timebinnning_rse  = c(rep(incidence_data[[1]]$inc_rse_1, 6), rep(incidence_data[[1]]$inc_rse_2, 5)),
+                    continuoustime = incidence_data[[2]]$glm_incidence,
+                    continuoustime_rse = incidence_data[[2]]$glm_inc_rse)
+
+
+dataq <-  data.frame(times = 2001:2011, 
+                     #true_incidence = linear_incidence(times  = 2001:2011, timesdisrupt = 2006),
+                     #timebinnning   = c(rep(incidence_data[[1]]$incidence_1, 6), rep(incidence_data[[1]]$incidence_2, 5)),
+                     binnning  = c(rep(incidence_data[[1]]$inc_rse_1, 6), rep(incidence_data[[1]]$inc_rse_2, 5)) * 100,
+                     #continuoustime = incidence_data[[2]]$glm_incidence,
+                     continuous = incidence_data[[2]]$glm_inc_rse * 100)
+
+
+data = melt(data = dataq, id = "times")
+
+
+ggplot(data) + geom_smooth(aes(x = times, y = value, colour= variable), size  = 1, se = F) +
+  scale_colour_manual(values=c("pink","purple"))+
+  labs(x = "time", y = "% relative standard error", color  = "")+
+  theme_bw(base_size = 18, base_family = "")
+
+
+
+data <- data.frame(times = 2001:2011,
+                   binning  = (abs(datan$true_incidence - datan$timebinnning)/ datan$true_incidence) * 100,
+                   continuous = (abs(datan$true_incidence - datan$continuoustime)/ datan$true_incidence) * 100)
+
+
+library(reshape2)
+
+data = melt(data = data, id = "times")
+
+
+ggplot(data) + geom_smooth(aes(x = times, y = value, colour= variable), size  = 1, se = F) +
+  scale_colour_manual(values=c("pink","purple"))+
+  labs(x = "time", y = "% relative bias", color  = "")+
+  theme_bw(base_size = 18, base_family = "") 
+
+
+
+
 write.table(incidence_data[[1]], file = "with_diruption_pvalues")
-incidence_data_pvalues <- read.table("/home/laurette/Desktop/Github/SANBAS/with_diruption_pvalues")
+incidence_data_pvalues <- read.table("/home/laurette/Desktop/Github/SANBS/with_diruption_pvalues")
 
 
 write.table(incidence_data[[2]], file = "with_diruption_glm")
-incidence_data_glm <- read.table("/home/laurette/Desktop/Github/SANBAS/with_diruption_glm")
+incidence_data_glm <- read.table("/home/laurette/Desktop/Github/SANBS/with_diruption_glm")
 
 
 # z_scores2 <- ggplot(incidence_data_pvalues, aes(z_statistic)) +
@@ -107,8 +152,14 @@ incidence_data_glm <- read.table("/home/laurette/Desktop/Github/SANBAS/with_diru
 pvalues_2 <- ggplot(incidence_data_pvalues, aes(pvalue)) +
   geom_histogram(bins = 10)+
   labs(x = "p-values", y = " frequency")+
-  theme_bw(base_size = 18, base_family = "")+
-  xlim(c(0,0.1))
+  theme_bw(base_size = 18, base_family = "")
+
+
+
+pvalues_glm <- ggplot(incidence_data_glm, aes(pvalue)) +
+  geom_histogram(bins = 10)+
+  labs(x = "p-values", y = " frequency")+
+  theme_bw(base_size = 18, base_family = "")
 
 
 # inc_diff2 <- ggplot(incidence_data_pvalues, aes(x = 1:length(delta_inc), y = abs(delta_inc))) +

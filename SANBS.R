@@ -35,27 +35,27 @@ incidence_step <- function(donationtimes, conc = 0.02, timemin = 2001,
   return(incidence)
 }
 
-linear_incidence <- function(times = 2001:2011,  timesmax = 2011, 
-                             timesmin = 2001, timesdisrupt= 2009,
-                             constant = 0, Imin = 0.01,
-                             Idisrupt = 0.02, Ifin = 0.03)
-{
-  
-  
-  if (constant > 0) {
-    
-    incidence <- rep(constant,length(times))
-    
-  } else {
-    
-    incidence <-  ifelse(times < timesdisrupt, Imin + ((Idisrupt - Imin)/(timesdisrupt -timesmin)) * (times - timesmin),
-                         ifelse(times <= timesmax, Idisrupt + ((Ifin - Idisrupt )/(timesmax - timesdisrupt)) * (times - timesdisrupt), 0))
-    
-    
-  }
-  
-  return(incidence)
-  }
+# linear_incidence <- function(times = 2001:2011,  timesmax = 2011, 
+#                              timesmin = 2001, timesdisrupt= 2009,
+#                              constant = 0, Imin = 0.01,
+#                              Idisrupt = 0.02, Ifin = 0.03)
+# {
+#   
+#   
+#   if (constant > 0) {
+#     
+#     incidence <- rep(constant,length(times))
+#     
+#   } else {
+#     
+#     incidence <-  ifelse(times < timesdisrupt, Imin + ((Idisrupt - Imin)/(timesdisrupt -timesmin)) * (times - timesmin),
+#                          ifelse(times <= timesmax, Idisrupt + ((Ifin - Idisrupt )/(timesmax - timesdisrupt)) * (times - timesdisrupt), 0))
+#     
+#     
+#   }
+#   
+#   return(incidence)
+#   }
 
 # prevelence of positives functions  --------------------------------------
 
@@ -154,7 +154,6 @@ prevalence_dataset <- function(times,
 # estimating the derivative of the incidence based on Kassanjee -----------
 
 
-
 derivative_incidence <- function(rec_pred,
                                  prev_pred,
                                  prev_grad,
@@ -165,20 +164,74 @@ derivative_incidence <- function(rec_pred,
                                  FRR, MDRI, big_T
 ){
   
+  #MDRI = MDRI / 365; big_T = big_T / 365
   
-  first_deriv_term <-  (((1 - 2 * (prev_pred)) / (1 - prev_pred)^2)*((rec_pred - FRR) / (MDRI - (FRR * big_T)))) * (rnorm(n = 1, mean = prev_grad, sd = prev_grad_se))
-  
-  
-  second_deriv_term <-  (prev_pred /((1 - prev_pred) * (MDRI - (FRR * big_T)))) * (rnorm(n = 1, mean = rec_grad, sd = rec_grad_se))
+  first_deriv_term <- ((rec_pred - FRR) * (rnorm(n = 1, mean = prev_grad, sd = prev_grad_se)))/((1 - prev_pred)^2 *(MDRI - (FRR * big_T)))
   
   
-  denominator <-  (1 - prev_pred) * (MDRI - FRR)
+  second_deriv_term <- (prev_pred * (rnorm(n = 1, mean = rec_grad, sd = rec_grad_se))) / ((1 - prev_pred) * (MDRI - (FRR * big_T)))
   
-  return(sum(c(first_deriv_term, second_deriv_term)))
+  
+  derivative <- first_deriv_term + second_deriv_term
+  
+  return( derivative )
   
 }
 
 
+
+# derivative_incidence <- function(rec_pred,
+#                                  prev_pred,
+#                                  prev_grad,
+#                                  prev_grad_se,
+#                                  rec_grad,
+#                                  rec_grad_se,
+#                                  donationtimes1,
+#                                  FRR, MDRI, big_T
+# ){
+#   
+#   # = MDRI / 365; big_T = big_T / 365
+#   
+#   first_deriv_term <-  (((1 - 2 * (prev_pred)) / (1 - prev_pred)^2)*((rec_pred - FRR) / (MDRI - (FRR * big_T)))) * (rnorm(n = 1, mean = prev_grad, sd = prev_grad_se))
+#   
+#   
+#   second_deriv_term <-  (prev_pred /((1 - prev_pred) * (MDRI - (FRR * big_T)))) * (rnorm(n = 1, mean = rec_grad, sd = rec_grad_se))
+#   
+#   
+#   denominator <-  (1 - prev_pred) * (MDRI - FRR)
+#   
+#   return(sum(c(first_deriv_term, second_deriv_term)))
+#   
+# }
+
+# error term derivative  --------------------------------------------------
+
+
+derivative_delta_method <- function(predprevalence, predrecency,
+                                    MDRI, FRR , bigT, prevstderror,
+                                    recstderror, devprevalence,
+                                    devrecency
+){
+  
+  #MDRI = MDRI / 365; bigT = bigT / 365
+  
+  partialdevprevalence <- ((((predrecency - FRR) * devprevalence  * 2)/ ((MDRI - (FRR * bigT))*(1 - predprevalence)^3)) +
+    (devrecency  / ((MDRI - (FRR * bigT))*(1 - predprevalence)^2)))
+  
+  
+  partialdevrecency <- (devprevalence / ((MDRI - (FRR * bigT)) * (1 - predprevalence)^2)) 
+  
+  
+  overall_error <-  sqrt((partialdevprevalence * prevstderror)^2 + (partialdevrecency * recstderror)^2)
+  
+  return(overall_error)
+
+  }
+
+# derivative_delta_method(predprevalence = 0.4016502, predrecency = 0.05039398,
+#                         MDRI = 182.5, FRR = 0.01, bigT = 730, prevstderror = 0.003098620,
+#                         recstderror = 0.002188974, devprevalence = -0.0005708268,
+#                         devrecency = 6.680063e-05)
 
 # simulations of the niterations of the donor's data set  -----------------
 
@@ -256,7 +309,7 @@ test_statistic_diff_inc <- function(niterations = 1,
     
     donationtimes_prime <- individualdata$donationtimes_prime
     
-    interpolated_times <- seq(min(donationtimes_prime), max(donationtimes_prime), (max(donationtimes_prime) - min(donationtimes_prime))/num_interpolations)
+    interpolated_times <-  seq(min(donationtimes_prime), max(donationtimes_prime), (max(donationtimes_prime) - min(donationtimes_prime))/ num_interpolations)
     
     prev_predictions <- predict(prevelance_fit, newdata = data.frame(donationtimes_prime = interpolated_times),
                                 se.fit = TRUE)
@@ -311,6 +364,14 @@ test_statistic_diff_inc <- function(niterations = 1,
     
     
     
+    
+    glm_incidence_output$inci_prime_o_se <- derivative_delta_method(predprevalence= pred_prevalences_pe, predrecency = pred_rec_prevalences_pe,
+                                                                    MDRI = MDRI, FRR = FRR, bigT = big_T, prevstderror =  pred_prevalences_se,
+                                                                    recstderror = pred_rec_prevalences_se, devprevalence = prev_gradient,
+                                                                    devrecency = rec_gradient)
+    
+    
+
    
     
     glm_incidence_data <- rbind(glm_incidence_data, glm_incidence_output)
@@ -357,13 +418,13 @@ test_statistic_diff_inc <- function(niterations = 1,
   }
   
   diff_incidence_data$delta_inc <- diff_incidence_data$incidence_1 - diff_incidence_data$incidence_2
-  diff_incidence_data$delta_inc_se <- sqrt(((diff_incidence_data$inc_rse_1  * diff_incidence_data$incidence_1)^2/niterations) +
-                                             ((diff_incidence_data$inc_rse_2 * diff_incidence_data$incidence_2)^2 /niterations))
+  diff_incidence_data$delta_inc_se <- sqrt(((diff_incidence_data$inc_rse_1  * diff_incidence_data$incidence_1)^2) +
+                                             ((diff_incidence_data$inc_rse_2 * diff_incidence_data$incidence_2)^2))
   
   diff_incidence_data$z_statistic <- diff_incidence_data$delta_inc / diff_incidence_data$delta_inc_se
   diff_incidence_data$pvalue <- 2 * pnorm(-abs(diff_incidence_data$z_statistic))
   
-  glm_incidence_data$pvalue <- 2 * pnorm(-abs(glm_incidence_data$inci_prime_o / (sd(glm_incidence_data$inci_prime_o)/sqrt(niterations))))
+  glm_incidence_data$pvalue <- 2 * pnorm(-abs(glm_incidence_data$inci_prime_o / (sd(glm_incidence_data$inci_prime_o))))
   
   
 
